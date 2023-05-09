@@ -1,40 +1,49 @@
+import PIL
 from PIL import Image
 from io import BytesIO
 import replicate
 import requests
 import openai
 import os
+import re
 
-# Anything else??
 
+openai.api_key = "sk-"
+openai.organization = "org"
+# replicate key
 
-# start with initial prompt
-# LOOP
-# create a battle plan for the following attacking description, summarize it in a concise and descriptive image generation
+def main(iterations: int = 10) -> None:
+    preprompt: str = (
+        "You are a battle image description imagineer. Your job is to given a description that I give "
+        "you of mid evil attack create a counter attack to the event. The counter attack should be in "
+        "a simple 3 sentence description. The only output to my input should be the "
+        "counter description. Use very simple and logical statements but make it fantastical. Initial prompt: \n"
+    )
+    initial_prompt: str = (
+        "The attacking force lined the hill in preparation for attack on the castle"
+    )
 
-# take output and call to replicate
-# wait
-# save output
-
-# update starting prompt
-
-preprompt: str = (
-    "You are a battle image description imagineer. Your job is to given a description that I give "
-    "you of mid evil attack create a counter attack to the event. The counter attack should be in "
-    "a simple 3 sentence description of a painting. The only output to my input should be the "
-    "counter description. Use very simple and logical statements."
-)
-initial_prompt: str = (
-    "Initial prompt: The attacking force lined the hill in preparation for attack on the castle"
-)
-
-def main(iterations: int = 2) -> None:
     for i in range(iterations):
+        initial_prompt = initial_prompt.lstrip(".\n")
+        initial_prompt = re.sub(r"^[^a-zA-Z]+", "", initial_prompt.strip())
+        initial_prompt = initial_prompt.replace('\n', '')
         current_prompt = preprompt + initial_prompt
-        print(f"\nThis is the prompt for attack {i}: {current_prompt}")
-        img = create_image(current_prompt)
+
+        print(f"creating image... {i}")
+        img = create_image(initial_prompt)
         file_name = "fight" + str(i) + ".png"
         img.save("./tmp/" + file_name)
+        print("image created")
+
+        print("saving text...")
+        with open("./tmp/story.md", "a") as f:
+            f.write("\n### " + initial_prompt + "\n")
+            f.write(f"![]({file_name})\n")
+
+        print("grabbing next prompt...")
+        if i == iterations-2:
+            print("last iteration")
+            current_prompt += "\nThis is the last battle end the story."
         initial_prompt = gpt_request(current_prompt)
     
 
@@ -61,7 +70,7 @@ def create_image(prompt: str) -> Image:
 
 
 def gpt_request(input_prompt: str)-> str:
-    return openai.Completion.create(
+    resp = openai.Completion.create(
         model="text-davinci-003",
         prompt=input_prompt,
         temperature=0.5,
@@ -69,8 +78,9 @@ def gpt_request(input_prompt: str)-> str:
         top_p=1.0,
         frequency_penalty=0.5,
         presence_penalty=0.0,
-        stop=["Initial prompt:"]
+        # stop=["Initial prompt:"]
     )
+    return resp.choices[0].text
 
 
 
